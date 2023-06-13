@@ -1,0 +1,51 @@
+---
+title: "CD8+"
+author: "Yuzhao Liu"
+date: "2023-06-09"
+output: html_document
+---
+
+```{r Load packages, message=FALSE}
+set.seed(123)
+library(flowCore)
+library(flowViz)
+library(flowVS)
+library(flowAI)
+library(PeacoQC)
+library(CATALYST)
+library(CytoNorm)
+library(SingleCellExperiment)
+library(uwot)
+library(knitr)
+library(xlsx)
+```
+
+
+2.1 Import data
+```{r Import data}
+# fcs_data <- read.FCS("FCS files/CD8+ T cells (+ activation_metabolic markers).fcs")
+# fcs_data_frame <- exprs(fcs_data)
+fcs.dir<- file.path(getwd(), "FCS files")
+
+fcs_data <- read.flowSet(path=fcs.dir, pattern="*.fcs", transformation = FALSE, truncate_max_range = FALSE) #fcs_data will be a FlowSet object
+```
+
+
+2.2 Transform data
+```{r Transform data}
+# markerstotransform <- c("CD45RA","CCR7",
+#                         "CD27","CD95","CD38","HLA-DR",
+#                         "PD1", "CTLA4", "TIM-3", "LAG-3", "TIGIT",
+#                         "GLUT1", "GAPDH", "MCT1", "CD98", "CD36","G6PD","ATP5A","IDH2","ACAC","CPT1A")
+markerstotransform <- c("FJComp-BV711-A")
+
+cofactors <- estParamFlowVS(fcs_data, channels=markerstotransform)
+fcs_transform <- transFlowVS(fcs_data, channels = markerstotransform, cofactors)
+```
+
+3 Automated quality control
+```{r Automated quality control (No pre-gated Time gate)}
+fcs_transform_QC <- flow_auto_qc(fcs_transform)
+```
+
+
