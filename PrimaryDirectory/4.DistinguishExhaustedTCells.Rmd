@@ -1,0 +1,348 @@
+---
+title: "Distinguishing exhauted T cells and analyse"
+output: html_notebook
+---
+
+1. Load packages and set directories
+```{r Load packages, message=FALSE}
+library(Spectre)
+Spectre::package.check()    # Check that all required packages are installed
+Spectre::package.load()     # Load required packages
+library(ggplot2)
+library(corrplot)
+library(pheatmap)
+library(dplyr)
+```
+
+```{r Set PrimaryDirectory}
+dirname(rstudioapi::getActiveDocumentContext()$path)
+setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
+getwd()
+PrimaryDirectory <- getwd()
+PrimaryDirectory
+```
+
+```{r Set 'input' directory}
+setwd(PrimaryDirectory)
+setwd("Transformed_CD4+_CD8+")
+InputDirectory <- getwd()
+setwd(PrimaryDirectory)
+```
+
+```{r Set 'metadata' directory}
+setwd(PrimaryDirectory)
+setwd("../metadata/")
+MetaDirectory <- getwd()
+setwd(PrimaryDirectory)
+```
+
+2. Import and prep data
+```{r Import data}
+setwd(InputDirectory)
+list.files(InputDirectory, ".csv")
+```
+```{r Read the data with Spectre package}
+data.list <- Spectre::read.files(file.loc = InputDirectory,
+                                 file.type = ".csv",
+                                 do.embed.file.names = TRUE)
+```
+
+```{r Check the data}
+check <- do.list.summary(data.list)
+check$name.table # Review column names and their subsequent values
+```
+```{r}
+check$ncol.check # Review number of columns (features, markers) in each sample
+```
+```{r}
+data.list[[1]]
+```
+```{r}
+### Merge data
+cell.dat <- Spectre::do.merge.files(dat = data.list)
+cell.dat
+```
+```{r Read in metadata}
+setwd(MetaDirectory)
+meta.dat <- fread("sample.details.csv")
+meta.dat
+```
+
+```{r Add metadata}
+cell.dat <- do.add.cols(cell.dat, "FileName", meta.dat, "Filename", rmv.ext = TRUE)
+cell.dat
+```
+
+```{r Change the column names from channel names to marker names}
+panel=read.csv("panel.csv") # Spectral flow cytometry panel
+new_names <- panel$antigen[match(names(cell.dat), panel$fcs_colname)]
+names(cell.dat) <- ifelse(is.na(new_names), names(cell.dat), new_names)
+names(cell.dat)
+```
+
+```{r Delete the first column}
+cell.dat=cell.dat[,-1]
+names(cell.dat)
+```
+
+```{r Change the order of factors of the Group column to make better plots}
+cell.dat$Group <- factor(cell.dat$Group)
+# Now order of the factors of the Group column
+new_levels <- c("Baseline CD8+ T cells", "1-week CD8+ T cells", "3-week CD8+ T cells", "Baseline CD4+ T cells", "1-week CD4+ T cells", "3-week CD4+ T cells")
+cell.dat$Group <- factor(cell.dat$Group, levels = new_levels)
+levels(cell.dat$Group)
+```
+
+```{r Check the number of different Group}
+table(cell.dat$Group)
+```
+
+
+
+3. Check the data to set the thresholds of positive/negative
+```{r Density plot of PD1 by Group}
+ggplot(cell.dat, aes(x=PD1)) +
+  geom_density(fill='skyblue') +
+  geom_vline(aes(xintercept=0), color="red", linetype="dashed") + 
+  facet_wrap(~Group) +
+  labs(x="PD1", y="Density")+
+  xlim(-10,10)
+```
+
+```{r Density plot of PD1 of one condition}
+filtered_data <- cell.dat[cell.dat$Group == "3-week CD8+ T cells", ]
+
+
+ggplot(filtered_data, aes(x=PD1)) +
+  geom_density(fill='skyblue') +
+  geom_vline(aes(xintercept=0), color="red", linetype="dashed") + 
+  labs(x="PD1", y="Density") +
+  xlim(-10, 10)
+```
+
+
+```{r Density plot of TIGIT by Group}
+ggplot(cell.dat, aes(x=TIGIT)) +
+  geom_density(fill='skyblue') + 
+  geom_vline(aes(xintercept=0.7), color="red", linetype="dashed") + 
+  facet_wrap(~Group) +
+  labs(x="TIGIT", y="Density")+
+  xlim(-0.5,3)
+```
+
+```{r Density plot of TIGIT of one condition}
+ggplot(filtered_data, aes(x=TIGIT)) +
+  geom_density(fill='skyblue') + 
+  geom_vline(aes(xintercept=0.7), color="red", linetype="dashed") + 
+  labs(x="TIGIT", y="Density")+
+  xlim(-0.5,3)
+```
+
+
+```{r Density plot of CD38 by Group}
+ggplot(cell.dat, aes(x=CD38)) +
+  geom_density(fill='skyblue') + 
+  geom_vline(aes(xintercept=3.5), color="red", linetype="dashed") + 
+  facet_wrap(~Group) +
+  labs( x="CD38", y="Density")+
+  xlim(-1,7)
+```
+
+```{r Density plot of CD38 for one condition}
+ggplot(filtered_data, aes(x=CD38)) +
+  geom_density(fill='skyblue') + 
+  geom_vline(aes(xintercept=3.5), color="red", linetype="dashed") + 
+  labs( x="CD38", y="Density")+
+  xlim(-1,7)
+```
+
+```{r Density plot of HLA-DR by Group}
+ggplot(cell.dat, aes(x=`HLA-DR`)) +
+  geom_density(fill='skyblue') + 
+  geom_vline(aes(xintercept=0), color="red", linetype="dashed") + 
+  facet_wrap(~Group) +
+  labs(x="HLA-DR", y="Density")+
+  xlim(-12,15)
+```
+
+4. Data analysis
+```{r Percentage of Exhausted T Cells by Group}
+# Create a new column to determine if a cell is exhausted
+cell.dat$Exhausted <- with(cell.dat, PD1 > 0 & TIGIT > 0.7 & CD38 > 3.5)
+exhaustion_rate <- aggregate(Exhausted ~ Group, data = cell.dat, FUN = mean)
+exhaustion_rate$Exhausted <- exhaustion_rate$Exhausted * 100
+
+ggplot(exhaustion_rate, aes(x = Group, y = Exhausted, fill = Group)) +
+  geom_bar(stat = "identity", position = position_dodge()) +
+  ylab("Percentage of Exhausted Cells") +
+  xlab("Group") +
+  scale_fill_brewer(palette = "Pastel1") + # Optional: Color the bars differently
+  theme_minimal() + # Optional: Use a minimal theme 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+```{r Pearson correlation coefficient (CD4+ T cells)}
+# Get needed markers
+markers <- c("PD1", "TIGIT", "CD38", "HLA-DR", "Glut1", "MCT1", "GAPDH", "G6PD", "IDH2", "ATP5A", "CD98", "CD36", "CPT1A", "ACAC")
+
+selected_data <- cell.dat[grepl("CD4", Group),  ..markers]
+
+# Calculate the Pearson correlation coefficient
+cor_matrix <- cor(selected_data, use = "pairwise.complete.obs", method = "pearson")
+
+# Create the matrix heatmap
+corrplot(cor_matrix, method = "color", type = "lower", 
+         tl.col = "black", tl.srt = 90, addrect = 2)
+```
+
+```{r Pearson correlation coefficient (CD8+ T cells)}
+# Get needed markers
+markers <- c("PD1", "TIGIT", "CD38", "HLA-DR", "Glut1", "MCT1", "GAPDH", "G6PD", "IDH2", "ATP5A", "CD98", "CD36", "CPT1A", "ACAC")
+
+selected_data <- cell.dat[grepl("CD8", Group),  ..markers]
+
+# Calculate the Pearson correlation coefficient
+cor_matrix <- cor(selected_data, use = "pairwise.complete.obs", method = "pearson")
+
+# Create the matrix heatmap
+corrplot(cor_matrix, method = "color", type = "lower", 
+         tl.col = "black", tl.srt = 90, addrect = 2)
+```
+
+```{r Downsample the data to analyse}
+cell.sub <- do.subsample(cell.dat, c(7000,7000,7000,2000,2000,2000), "Group")
+```
+
+
+
+```{r Make heatmap}
+# Downsample the data to make heatmap
+cell.sub <- do.subsample(cell.dat, c(2000,2000,2000,2000,2000,2000), "Group")
+
+for(group in unique(cell.dat$Group)){
+  group.data <- cell.sub[cell.sub$Group == group, ..markers]
+  pheatmap(group.data,
+           color = colorRampPalette(c("navy", "white", "firebrick3"))(100), 
+           scale = "row" ,
+           cluster_cols = FALSE
+  )
+}
+```
+
+```{r Pearson correlation coefficient (CD4+ T cells, downsampled data)}
+# Get needed markers
+markers <- c("PD1", "TIGIT", "CD38", "HLA-DR", "Glut1", "MCT1", "GAPDH", "G6PD", "IDH2", "ATP5A", "CD98", "CD36", "CPT1A", "ACAC")
+
+selected_data <- cell.sub[grepl("CD4", Group),  ..markers]
+
+# Calculate the Pearson correlation coefficient
+cor_matrix <- cor(selected_data, use = "pairwise.complete.obs", method = "pearson")
+
+# Create the matrix heatmap
+corrplot(cor_matrix, method = "color", type = "lower", 
+         tl.col = "black", tl.srt = 90, addrect = 2)
+```
+
+```{r Pearson correlation coefficient (CD8+ T cells, downsampled data)}
+# Get needed markers
+markers <- c("PD1", "TIGIT", "CD38", "HLA-DR", "Glut1", "MCT1", "GAPDH", "G6PD", "IDH2", "ATP5A", "CD98", "CD36", "CPT1A", "ACAC")
+
+selected_data <- cell.sub[grepl("CD8", Group),  ..markers]
+
+# Calculate the Pearson correlation coefficient
+cor_matrix <- cor(selected_data, use = "pairwise.complete.obs", method = "pearson")
+
+# Create the matrix heatmap
+corrplot(cor_matrix, method = "color", type = "lower", 
+         tl.col = "black", tl.srt = 90, addrect = 2)
+```
+
+
+```{r Make violin plots}
+for(marker in markers) {
+  # Create a new data.frame including only the markers of interest
+  data_to_plot <- cell.sub %>%
+    select(Group, Exhausted, marker) %>%
+    mutate(
+      Cell_Type = ifelse(grepl("CD8", Group), "CD8+ T cell", "CD4+ T cell"),
+      Status = ifelse(Exhausted, "Exhausted", "Non-exhausted"),
+      Identity = paste0(Status, " ",Cell_Type) 
+    ) %>%
+    mutate(
+      Identity = factor(Identity, levels = c("Non-exhausted CD8+ T cell", "Exhausted CD8+ T cell", "Non-exhausted CD4+ T cell", "Exhausted CD4+ T cell"))
+    )
+
+  # Make violin plots
+  p <- ggplot(data_to_plot, aes(x = Identity, y = .data[[marker]], fill = Identity)) +
+    geom_violin(trim = FALSE) +
+    labs(title = marker, y = "Expression", x = "") +
+    theme_bw() +
+    theme(legend.position = "none")
+
+  print(p)
+  
+  
+  file_name <- paste0("violin_plots/", marker, ".png")
+  ggsave(file_name, plot = p)
+}
+  
+```
+
+```{r Make violin plots for some markers that have outliers (GAPDH)}
+
+  data_to_plot <- cell.sub %>%
+    select(Group, Exhausted, "GAPDH") %>%
+    mutate(
+      Cell_Type = ifelse(grepl("CD8", Group), "CD8+ T cell", "CD4+ T cell"),
+      Status = ifelse(Exhausted, "Exhausted", "Non-exhausted"),
+      Identity = paste0(Status, " ",Cell_Type) 
+    ) %>%
+    mutate(
+      Identity = factor(Identity, levels = c("Non-exhausted CD8+ T cell", "Exhausted CD8+ T cell", "Non-exhausted CD4+ T cell", "Exhausted CD4+ T cell"))
+    )
+
+  # Make violin plots
+  p <- ggplot(data_to_plot, aes(x = Identity, y = GAPDH, fill = Identity)) +
+    geom_violin(trim = FALSE) +
+    labs(title = "GAPDH", y = "Expression", x = "") +
+    theme_bw() +
+    theme(legend.position = "none") +
+    coord_cartesian(ylim = c(7.5, 14))  
+  
+
+  print(p)
+  
+```
+
+```{r Make violin plots for some markers that have outliers (CD98)}
+
+  data_to_plot <- cell.sub %>%
+    select(Group, Exhausted, "CD98") %>%
+    mutate(
+      Cell_Type = ifelse(grepl("CD8", Group), "CD8+ T cell", "CD4+ T cell"),
+      Status = ifelse(Exhausted, "Exhausted", "Non-exhausted"),
+      Identity = paste0(Status, " ",Cell_Type) 
+    ) %>%
+    mutate(
+      Identity = factor(Identity, levels = c("Non-exhausted CD8+ T cell", "Exhausted CD8+ T cell", "Non-exhausted CD4+ T cell", "Exhausted CD4+ T cell"))
+    )
+
+  # Make violin plots
+  p <- ggplot(data_to_plot, aes(x = Identity, y = CD98, fill = Identity)) +
+    geom_violin(trim = FALSE) +
+    labs(title = "CD98", y = "Expression", x = "") +
+    theme_bw() +
+    theme(legend.position = "none") +
+    coord_cartesian(ylim = c(9, 16))  
+  
+
+  print(p)
+  
+```
+
+
+```{r Save the downsamped data in .csv format}
+write.csv(cell.sub,"FinalProcessed_CD4+_CD8+/Final_Processed_Data_sub.csv")
+```
+

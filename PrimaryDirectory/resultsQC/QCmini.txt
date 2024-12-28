@@ -1,0 +1,22 @@
+Name file	n. of events	% anomalies	analysis from	% anomalies flow Rate	% anomalies Signal	% anomalies Margins
+1W no Tec	194376	58.45	Flow Rate, Flow Signal and Flow Margin	30.19	28.75	21.94
+1W no Tec	194376	99.35	Flow Rate, Flow Signal and Flow Margin	78.28	28.49	29.45
+3W no Tec	327544	28.22	Flow Rate, Flow Signal and Flow Margin	3.3	0	25.67
+Baseline	692160	39.4	Flow Rate, Flow Signal and Flow Margin	27.19	0	16.9
+1W no Tec	194376	35.98	Flow Signal and Flow Margin	78.28	28.49	29.45
+3W no Tec	327544	25.67	Flow Signal and Flow Margin	3.3	0	25.67
+Baseline	692160	16.9	Flow Signal and Flow Margin	27.19	0	16.9
+1W no Tec	124444	14.23	Flow Signal and Flow Margin	55.6	0	14.23
+3W no Tec	243477	17.5	Flow Signal and Flow Margin	3.85	0	17.5
+Baseline	575165	7.61	Flow Signal and Flow Margin	48.6	0	7.61
+1W no Tec	194376	35.98	Flow Signal and Flow Margin	78.28	28.49	29.45
+3W no Tec	327544	25.67	Flow Signal and Flow Margin	3.3	0	25.67
+Baseline	692160	16.9	Flow Signal and Flow Margin	27.19	0	16.9
+1W no Tec	124444	14.23	Flow Signal and Flow Margin	55.6	0	14.23
+1W no Tec	194376	35.98	Flow Signal and Flow Margin	78.28	28.49	29.45
+Baseline	692160	39.4	Flow Rate, Flow Signal and Flow Margin	27.19	0	16.9
+1W no Tec	194376	35.98	Flow Signal and Flow Margin	78.28	28.49	29.45
+3W no Tec	327544	28.22	Flow Rate, Flow Signal and Flow Margin	3.3	0	25.67
+Baseline	692160	39.4	Flow Rate, Flow Signal and Flow Margin	27.19	0	16.9
+1W no Tec	194376	35.98	Flow Signal and Flow Margin	78.28	28.49	29.45
+3W no Tec	327544	28.22	Flow Rate, Flow Signal and Flow Margin	3.3	0	25.67

@@ -1,0 +1,75 @@
+---
+title: "Arcsinh transformation"
+author: "Yuzhao Liu"
+output: 
+  pdf_document:
+    latex_engine: xelatex
+  html_document: default
+---
+
+```{r Load packages, message=FALSE}
+set.seed(123)
+library(flowCore)
+library(flowVS)
+```
+
+
+1 Import screened data (CD4+ T cells and CD8+ T cells)
+```{r Import data}
+fcs.dir<- file.path(getwd(), "screened_CD4+_CD8+")
+
+fcs_data <- read.flowSet(path=fcs.dir, pattern="*.fcs", transformation = FALSE, truncate_max_range = FALSE) #fcs_data will be a FlowSet object
+```
+
+
+2.1 Transform data
+```{r Load the panel of spectral flow cytometry}
+panel=read.csv("panel.csv")
+```
+
+```{r Only transform the markers of interest}
+markerstotransform=panel[c(8,10:21,28:31,33:38),2]
+```
+
+```{r Transforming data with FlowVS package, eval=FALSE }
+# Downsampe data to reduce computational cost
+Downsampling_FlowSet <- function(x, samplesize , replace=TRUE, prob=NULL){
+  if(missing(samplesize))
+    samplesize <- min(flowCore::fsApply(x,nrow))
+  flowCore::fsApply(x, function(ff){
+    i <- sample(nrow(ff), size = samplesize, replace=replace, prob)
+    ff[i,]
+  })
+}
+
+fcs_data_small <- Downsampling_FlowSet(x=fcs_data, samplesize = 2000) #samplesize is the number of cells included, you can include more cells.
+
+cofactors <- estParamFlowVS(fcs_data_small, channels=markerstotransform)
+cofactordata <- data.frame(markerstotransform, cofactors)
+write.csv(x=cofactordata, file="cofactordata.csv") #save the cofactors
+
+
+fcs_transform <- transFlowVS(fcs_data, channels = markerstotransform, cofactors)
+filenames <- sampleNames(fcs_data)
+sampleNames(fcs_transform) <- filenames
+
+```
+
+2.2 Visualize the data
+```{r Visualize the transformed data (Before and after arcsinh transformation)}
+par(mfrow=c(length(markerstotransform), 2))
+for (channel in markerstotransform){
+  print(densityplot(as.formula(paste0("~`", channel, "`")), data = fcs_data[[1]], main = paste("fcs_data:", channel)))
+  print(densityplot(as.formula(paste0("~`", channel, "`")), data = fcs_transform[[1]], main = paste("fcs_transform:", channel)))
+}
+```
+
+
+3 Save the transformed data into .csv format
+```{r}
+for (i in seq_len(length(fcs_transform))) {
+  df <- as.data.frame(exprs(fcs_transform[[i]]))
+  name = gsub(".fcs", "", sampleNames(fcs_transform)[i])
+  write.csv(df, file = paste0("Transformed_CD4+_CD8+/", name, ".csv"))
+}
+```

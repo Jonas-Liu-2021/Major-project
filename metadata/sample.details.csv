@@ -1,0 +1,7 @@
+﻿Filename,Sample,Group,Batch
+CD8+_Baseline.csv,A,Baseline CD8+ T cells,1
+CD8+_1-week cells.csv,A,1-week CD8+ T cells,1
+CD8+_3-week cells.csv,A,3-week CD8+ T cells,1
+CD4+_Baseline.csv,A,Baseline CD4+ T cells,1
+CD4+_1-week cells.csv,A,1-week CD4+ T cells,1
+CD4+_3-week cells.csv,A,3-week CD4+ T cells,1

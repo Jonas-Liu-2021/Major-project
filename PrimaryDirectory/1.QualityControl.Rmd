@@ -1,0 +1,44 @@
+---
+title: "Quality Control"
+output: html_notebook
+---
+1. Load packages and set directories
+```{r Load package}
+library(flowCore)
+library(flowAI)
+```
+
+```{r Set PrimaryDirectory}
+dirname(rstudioapi::getActiveDocumentContext()$path)
+setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
+getwd()
+PrimaryDirectory <- getwd()
+PrimaryDirectory
+```
+
+```{r Set 'input' directory}
+setwd(PrimaryDirectory)
+setwd("../data/")
+InputDirectory <- getwd()
+setwd(PrimaryDirectory)
+```
+
+2. Import data
+```{r Import data}
+fcs_data_original <- read.flowSet(path=InputDirectory, pattern="*.fcs", transformation = FALSE, truncate_max_range = FALSE)
+```
+
+```{r Check data}
+names(fcs_data_original[[1]])
+fcs_data_original[[1]]
+```
+
+3. Quality Control
+```{r Quality Control with flowAI}
+# Baseline cells
+flow_auto_qc(fcs_data_original[[3]],second_fractionFR = 1,fcs_highQ=TRUE)
+# 1-week cells (The flow rate of 1-week cells was changed manually several times and flowAI package cannot work for this. So we did not remove anomalies caused by flow rate. This might not has much effect on the subsequent analysis)
+flow_auto_qc(fcs_data_original[[1]],second_fractionFR = 1,remove_from = "FS_FM",fcs_highQ=TRUE)
+# 3-week cells
+flow_auto_qc(fcs_data_original[[2]],second_fractionFR = 1,fcs_highQ=TRUE)
+```

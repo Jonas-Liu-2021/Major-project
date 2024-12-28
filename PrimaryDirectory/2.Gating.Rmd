@@ -1,0 +1,464 @@
+---
+title: "Gating strategy to get CD4+ T cells and CD8+ T cells"
+output: html_notebook
+---
+
+1. Load packages and set directories
+```{r Load packsges}
+library(ggplot2)
+library(flowCore)
+library(ggcyto)
+```
+
+```{r}
+### Set PrimaryDirectory
+dirname(rstudioapi::getActiveDocumentContext()$path)
+setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
+getwd()
+PrimaryDirectory <- getwd()
+PrimaryDirectory
+```
+
+```{r}
+### Set 'input' directory
+setwd(PrimaryDirectory)
+setwd("resultsQC")
+InputDirectory <- getwd()
+setwd(PrimaryDirectory)
+```
+
+2. Import and gate data
+```{r Import data}
+fcs_to_screen_original <- read.flowSet(path=InputDirectory, pattern="*TRUE.fcs", transformation = FALSE, truncate_max_range = FALSE)
+```
+
+```{r Check data}
+names(fcs_to_screen_original[[1]])
+fcs_to_screen_original[[1]]
+```
+
+
+```{r Check the density of the marker "Viability", fig.height=3.3, fig.width=10}
+all_data <- rbind(
+  data.frame(exprs(fcs_to_screen_original[[3]]), sample = "Baseline", check.names = FALSE),
+  data.frame(exprs(fcs_to_screen_original[[1]]), sample = "1-week cells", check.names = FALSE),
+  data.frame(exprs(fcs_to_screen_original[[2]]), sample = "3-week cells", check.names = FALSE)
+)
+all_data$sample <- factor(all_data$sample, levels = c("Baseline", "1-week cells", "3-week cells"))
+
+p <- ggplot(all_data, aes(x=`LIVE DEAD Blue-A`)) +
+  geom_density(fill='skyblue') +
+  geom_vline(aes(xintercept = -7000), linetype="dashed", color="red") + 
+  geom_vline(aes(xintercept = 5000), linetype="dashed", color="red") + 
+  facet_wrap(~ sample, scales = "fixed", ncol = 3) +
+  labs(x="Viability", y="Density") +
+  xlim(-8000, 100000)
+
+print(p)
+```
+
+```{r This is to make an example plot for my thesis}
+baseline_data <- subset(all_data, sample == "Baseline")
+p <- ggplot(baseline_data, aes(x=`LIVE DEAD Blue-A`)) +
+  geom_density(fill='skyblue') +
+  geom_vline(aes(xintercept = -7000), linetype="dashed", color="red") + 
+  geom_vline(aes(xintercept = 5000), linetype="dashed", color="red") + 
+  labs(x="Viability", y="Density") +
+  xlim(-8000, 30000)
+
+print(p)
+```
+
+
+
+
+```{r}
+fcs_to_screen_original_plot <- flowSet(list(
+    `Baseline` = fcs_to_screen_original[[3]],
+    `1-week cells` = fcs_to_screen_original[[1]],
+    `3-week cells` = fcs_to_screen_original[[2]]
+))
+
+rect_gate_viable <- rectangleGate(filterId="screen_viable_cells", list("LIVE DEAD Blue-A"=c(-7000, 5000),"SSC-A"=c(30000,4000000)))
+
+p <- ggcyto(fcs_to_screen_original_plot[[1]], aes(x = `LIVE DEAD Blue-A`, y = `SSC-A`)) +
+  geom_hex(bins = 128) +
+  scale_x_logicle(w=1.5) +
+  scale_y_logicle() +
+  geom_gate(rect_gate_viable) +
+  theme_bw() +
+  labs(x = "Viability", y = "SSC-A")+
+  coord_cartesian(ylim = c(10000, 5000000))+
+  annotate("label", x = 0, y = 20000, label = "Viable cell", boxplot.fill = "white", size = 4, color = "black")
+
+print(p)
+
+p <- ggcyto(fcs_to_screen_original_plot[[2]], aes(x = `LIVE DEAD Blue-A`, y = `SSC-A`)) +
+  geom_hex(bins = 128) +
+  scale_x_logicle(w=1.5) +
+  scale_y_logicle() +
+  geom_gate(rect_gate_viable) + 
+  theme_bw() +
+  labs(x = "Viability", y = "SSC-A")+
+  coord_cartesian(ylim = c(10000, 5000000))+
+  annotate("label", x = 0, y = 20000, label = "Viable cell", boxplot.fill = "white", size = 4, color = "black") 
+print(p)
+
+p <- ggcyto(fcs_to_screen_original_plot[[3]], aes(x = `LIVE DEAD Blue-A`, y = `SSC-A`)) +
+  geom_hex(bins = 128) +
+  scale_x_logicle(w=1.5) +
+  scale_y_logicle() +
+  geom_gate(rect_gate_viable) + 
+  theme_bw() +
+  labs(x = "Viability", y = "SSC-A")+
+  coord_cartesian(ylim = c(10000, 5000000))+
+  annotate("label", x = 0, y = 20000, label = "Viable cell", boxplot.fill = "white", size = 4, color = "black") 
+print(p)
+```
+
+
+```{r Screen live cells (Viability-)}
+rect_gate <- rectangleGate(filterId="screen_live_cells", list("LIVE DEAD Blue-A"=c(-7000, 5000)))
+screened_data_live <- Subset(fcs_to_screen_original, rect_gate)
+```
+
+
+```{r Check the density of the marker "CD45" of live cells, fig.height=3.3, fig.width=10}
+all_data <- rbind(
+  data.frame(exprs(screened_data_live[[3]]), sample = "Baseline", check.names = FALSE),
+  data.frame(exprs(screened_data_live[[1]]), sample = "1-week cells", check.names = FALSE),
+  data.frame(exprs(screened_data_live[[2]]), sample = "3-week cells", check.names = FALSE)
+)
+all_data$sample <- factor(all_data$sample, levels = c("Baseline", "1-week cells", "3-week cells"))
+
+p <- ggplot(all_data, aes(x=`Pacific Orange-A`)) +
+  geom_density(fill='skyblue') +
+  geom_vline(aes(xintercept = 20000), linetype="dashed", color="red") + 
+  geom_vline(aes(xintercept = 200000), linetype="dashed", color="red") + 
+  facet_wrap(~ sample, scales = "fixed", ncol = 3) +
+  labs(x="CD45", y="Density") +
+  xlim(-28000, 210000)
+
+print(p)
+```
+
+```{r This is to make an example plot for my thesis}
+baseline_data <- subset(all_data, sample == "Baseline")
+p <- ggplot(baseline_data, aes(x=`Pacific Orange-A`)) +
+  geom_density(fill='skyblue') +
+  geom_vline(aes(xintercept = 20000), linetype="dashed", color="red") + 
+  geom_vline(aes(xintercept = 200000), linetype="dashed", color="red") + 
+  labs(x="CD45", y="Density") +
+  xlim(-28000, 210000)
+
+print(p)
+```
+
+```{r}
+screened_data_live_plot <- flowSet(list(
+    `Baseline` = screened_data_live[[3]],
+    `1-week cells` = screened_data_live[[1]],
+    `3-week cells` = screened_data_live[[2]]
+))
+
+rect_gate_immune <- rectangleGate(filterId="screen_immunine_cell", list("Pacific Orange-A"=c(20000, 200000),"SSC-A"=c(100000,4000000)))
+
+
+p <- ggcyto(screened_data_live_plot[[1]], aes(x = `Pacific Orange-A`, y = `SSC-A`)) +
+  geom_hex(bins = 128) +
+  scale_x_logicle(w=1.5) +
+  scale_y_logicle() +
+  geom_gate(rect_gate_immune) +
+  theme_bw() +
+  labs(x = "CD45", y = "SSC-A")+
+  coord_cartesian(ylim = c(10000, 5000000))+
+  annotate("label", x = 70000, y = 70000, label = "Immune cell", boxplot.fill = "white", size = 4, color = "black")
+
+print(p)
+
+p <- ggcyto(screened_data_live_plot[[2]], aes(x = `Pacific Orange-A`, y = `SSC-A`)) +
+  geom_hex(bins = 128) +
+  scale_x_logicle(w=1.5) +
+  scale_y_logicle() +
+  geom_gate(rect_gate_immune) + 
+  theme_bw() +
+  labs(x = "CD45", y = "SSC-A")+
+  coord_cartesian(ylim = c(10000, 5000000))+
+  annotate("label", x = 70000, y = 70000, label = "Immune cell", boxplot.fill = "white", size = 4, color = "black") 
+print(p)
+
+p <- ggcyto(screened_data_live_plot[[3]], aes(x = `Pacific Orange-A`, y = `SSC-A`)) +
+  geom_hex(bins = 128) +
+  scale_x_logicle(w=1.5) +
+  scale_y_logicle() +
+  geom_gate(rect_gate_immune) + 
+  theme_bw() +
+  labs(x = "CD45", y = "SSC-A")+
+  coord_cartesian(ylim = c(10000, 5000000))+
+  annotate("label", x = 70000, y = 70000, label = "Immune cell", boxplot.fill = "white", size = 4, color = "black") 
+print(p)
+```
+
+```{r Screen immunine cells (CD45+) from live cells}
+rect_gate_2 <- rectangleGate(filterId="screen_immunine_cells", list("Pacific Orange-A"=c(20000, 200000)))
+screened_data_immuninecells <- Subset(screened_data_live, rect_gate_2)
+```
+
+```{r Check the density of the marker "CD3" of immunine cells, fig.height=3.3, fig.width=10}
+all_data <- rbind(
+  data.frame(exprs(screened_data_immuninecells[[3]]), sample = "Baseline", check.names = FALSE),
+  data.frame(exprs(screened_data_immuninecells[[1]]), sample = "1-week cells", check.names = FALSE),
+  data.frame(exprs(screened_data_immuninecells[[2]]), sample = "3-week cells", check.names = FALSE)
+)
+all_data$sample <- factor(all_data$sample, levels = c("Baseline", "1-week cells", "3-week cells"))
+
+p <- ggplot(all_data, aes(x=`BV510-A`)) +
+  geom_density(fill='skyblue') +
+  geom_vline(aes(xintercept = 11000), linetype="dashed", color="red") + 
+  geom_vline(aes(xintercept = 240000), linetype="dashed", color="red") + 
+  facet_wrap(~ sample, scales = "fixed", ncol = 3) +
+  labs(x="CD3", y="Density") +
+  xlim(-30000, 250000)
+
+print(p)
+```
+
+
+```{r Check the density of the marker "CD19" of immune cells, fig.height=3.3, fig.width=10}
+all_data <- rbind(
+  data.frame(exprs(screened_data_immuninecells[[3]]), sample = "Baseline", check.names = FALSE),
+  data.frame(exprs(screened_data_immuninecells[[1]]), sample = "1-week cells", check.names = FALSE),
+  data.frame(exprs(screened_data_immuninecells[[2]]), sample = "3-week cells", check.names = FALSE)
+)
+all_data$sample <- factor(all_data$sample, levels = c("Baseline", "1-week cells", "3-week cells"))
+
+p <- ggplot(all_data, aes(x=`Super Bright 436-A`)) +
+  geom_density(fill='skyblue') +
+  geom_vline(aes(xintercept = -6000), linetype="dashed", color="red") + 
+  geom_vline(aes(xintercept = 24000), linetype="dashed", color="red") + 
+  facet_wrap(~ sample, scales = "fixed", ncol = 3) +
+  labs(x="CD19", y="Density") +
+  xlim(-6000, 150000)
+
+print(p)
+```
+
+```{r Screen T cells (CD3+, CD19-) from immune cells}
+rect_gate_3 <- rectangleGate(filterId="screen_T_cells", list("BV510-A"=c(11000, 220000), "Super Bright 436-A"=c(-6000, 24000)))
+screened_data_Tcells <- Subset(screened_data_immuninecells, rect_gate_3)
+```
+
+```{r Check the scatter plot of CD3 vs CD19}
+screened_data_immuninecellss <- flowSet(list(
+    `Baseline` = screened_data_immuninecells[[3]],
+    `1-week cells` = screened_data_immuninecells[[1]],
+    `3-week cells` = screened_data_immuninecells[[2]]
+))
+
+p <- ggcyto(screened_data_immuninecellss[[1]], aes(x = `BV510-A`, y = `Super Bright 436-A`)) +
+  geom_hex(bins = 128) +
+  scale_x_logicle(w=1.9,m=4.5) +
+  scale_y_logicle(w=1.5,m=4.5) +
+  geom_gate(rect_gate_3) + 
+  theme_bw() +
+  labs(x = "CD3", y = "CD19")+
+  coord_cartesian(xlim = c(-50000, 250000), ylim = c(-6000, 300000))+
+  annotate("label", x = 6000, y = 0, label = "T cells", boxplot.fill = "white", size = 4, color = "black") 
+
+print(p)
+
+p <- ggcyto(screened_data_immuninecellss[[2]], aes(x = `BV510-A`, y = `Super Bright 436-A`)) +
+  geom_hex(bins = 128) +
+  scale_x_logicle(w=1.9,m=4.5) +
+  scale_y_logicle(w=1.5,m=4.5) +
+  geom_gate(rect_gate_3) + 
+  theme_bw() +
+  labs(x = "CD3", y = "CD19")+
+  coord_cartesian(xlim = c(-50000, 250000), ylim = c(-6000, 300000))+
+  annotate("label", x = 6000, y = 0, label = "T cells", boxplot.fill = "white", size = 4, color = "black") 
+print(p)
+
+p <- ggcyto(screened_data_immuninecellss[[3]], aes(x = `BV510-A`, y = `Super Bright 436-A`)) +
+  geom_hex(bins = 128) +
+  scale_x_logicle(w=1.9,m=4.5) +
+  scale_y_logicle(w=1.5,m=4.5) +
+  geom_gate(rect_gate_3) + 
+  theme_bw() +
+  labs(x = "CD3", y = "CD19")+
+  coord_cartesian(xlim = c(-50000, 250000), ylim = c(-6000, 300000))+
+  annotate("label", x = 6000, y = 0, label = "T cells", boxplot.fill = "white", size = 4, color = "black") 
+print(p)
+```
+
+
+
+```{r Check the density of the marker "CD4" of T cells, fig.height=3.3, fig.width=10}
+all_data <- rbind(
+  data.frame(exprs(screened_data_Tcells[[3]]), sample = "Baseline", check.names = FALSE),
+  data.frame(exprs(screened_data_Tcells[[1]]), sample = "1-week cells", check.names = FALSE),
+  data.frame(exprs(screened_data_Tcells[[2]]), sample = "3-week cells", check.names = FALSE)
+)
+all_data$sample <- factor(all_data$sample, levels = c("Baseline", "1-week cells", "3-week cells"))
+
+p <- ggplot(all_data, aes(x=`cFluor YG584-A`)) +
+  geom_density(fill='skyblue') +
+  geom_vline(aes(xintercept = -50000), linetype="dashed", color="red") + 
+  geom_vline(aes(xintercept = 400000), linetype="dashed", color="red") + 
+  geom_vline(data = subset(all_data,sample=="Baseline"),aes(xintercept = 6000), linetype="dashed", color="red") + 
+  geom_vline(data = subset(all_data,sample=="1-week cells"),aes(xintercept = 16000), linetype="dashed", color="red") + 
+  geom_vline(data = subset(all_data,sample=="3-week cells"),aes(xintercept = 30000), linetype="dashed", color="red") + 
+  facet_wrap(~ sample, scales = "fixed", ncol = 3) +
+  labs(x="CD4", y="Density") +
+  xlim(-50000, 400000)
+
+print(p)
+```
+
+```{r Check the density of the marker "CD8" of T cells, fig.height=3.3, fig.width=10}
+all_data <- rbind(
+  data.frame(exprs(screened_data_Tcells[[3]]), sample = "Baseline", check.names = FALSE),
+  data.frame(exprs(screened_data_Tcells[[1]]), sample = "1-week cells", check.names = FALSE),
+  data.frame(exprs(screened_data_Tcells[[2]]), sample = "3-week cells", check.names = FALSE)
+)
+all_data$sample <- factor(all_data$sample, levels = c("Baseline", "1-week cells", "3-week cells"))
+
+p <- ggplot(all_data, aes(x=`Spark Blue 550-A`)) +
+  geom_density(fill='skyblue') +
+  geom_vline(aes(xintercept = -20000), linetype="dashed", color="red") + 
+  geom_vline(aes(xintercept = 20000), linetype="dashed", color="red") + 
+  geom_vline(aes(xintercept = 200000), linetype="dashed", color="red") + 
+  facet_wrap(~ sample, scales = "fixed", ncol = 3) +
+  labs(x="CD8", y="Density") +
+  xlim(-20000, 200000)
+
+print(p)
+```
+
+```{r Screen CD4+ T cells (CD4+, CD8-)}
+rect_gate_baseline_CD4 <- rectangleGate(filterId="screen_CD4+Tcells_baseline", list("cFluor YG584-A"=c(6000, 150000), "Spark Blue 550-A"=c(-20000, 6000)))
+rect_gate_1week_CD4 <- rectangleGate(filterId="screen_CD4+Tcells_1week", list("cFluor YG584-A"=c(10000, 600000), "Spark Blue 550-A"=c(-30000, 6000)))
+rect_gate_3week_CD4 <- rectangleGate(filterId="screen_CD4+Tcells_3week", list("cFluor YG584-A"=c(15000, 600000), "Spark Blue 550-A"=c(-30000, 6000)))
+
+screened_data_CD4Tcells_baseline <- Subset(screened_data_Tcells[[3]], rect_gate_baseline_CD4)
+screened_data_CD4Tcells_1week <- Subset(screened_data_Tcells[[1]], rect_gate_1week_CD4)
+screened_data_CD4Tcells_3week <- Subset(screened_data_Tcells[[2]], rect_gate_3week_CD4)
+
+screened_data_CD4_Tcells <- flowSet(list(`Baseline` = screened_data_CD4Tcells_baseline,
+                                                `1-week cells` = screened_data_CD4Tcells_1week,
+                                                `3-week cells`=screened_data_CD4Tcells_3week))
+```
+
+
+```{r Screen CD8+ T cells (CD8+, CD4-)}
+rect_gate_baseline_CD8 <- rectangleGate(filterId="screen_CD4+Tcells_baseline", list("cFluor YG584-A"=c(-10000,-200), "Spark Blue 550-A"=c(30000, 400000)))
+rect_gate_1week_CD8 <- rectangleGate(filterId="screen_CD4+Tcells_1week", list("cFluor YG584-A"=c(-30000,-200), "Spark Blue 550-A"=c(16000, 400000)))
+rect_gate_3week_CD8 <- rectangleGate(filterId="screen_CD4+Tcells_3week", list("cFluor YG584-A"=c(-30000,-200), "Spark Blue 550-A"=c(30000, 400000)))
+
+screened_data_CD8Tcells_baseline <- Subset(screened_data_Tcells[[3]], rect_gate_baseline_CD8)
+screened_data_CD8Tcells_1week <- Subset(screened_data_Tcells[[1]], rect_gate_1week_CD8)
+screened_data_CD8Tcells_3week <- Subset(screened_data_Tcells[[2]], rect_gate_3week_CD8)
+
+screened_data_CD8_Tcells <- flowSet(list(`Baseline` = screened_data_CD8Tcells_baseline,
+                                                `1-week cells` = screened_data_CD8Tcells_1week,
+                                                `3-week cells` = screened_data_CD8Tcells_3week))
+```
+
+
+
+```{r Gating CD4+ T cells and CD8+ T cells}
+screened_data_TTcells <- flowSet(list(
+    `Baseline` = screened_data_Tcells[[3]],
+    `1-week cells` = screened_data_Tcells[[1]],
+    `3-week cells` = screened_data_Tcells[[2]]
+))
+
+p <- ggcyto(screened_data_TTcells[[1]], aes(x = `cFluor YG584-A`, y = `Spark Blue 550-A`)) +
+  geom_hex(bins = 128) +
+  scale_x_logicle() +
+  scale_y_logicle(w=1.5) +
+  geom_gate(rect_gate_baseline_CD4) + 
+  geom_gate(rect_gate_baseline_CD8) + 
+  theme_bw() +
+  labs(x = "CD4", y = "CD8")+
+  annotate("label", x = 2000, y = 0, label = "CD4+ T cells", boxplot.fill = "white", size = 4, color = "black") +
+  annotate("label", x = -1500, y = 20000, label = "CD8+ T cells", boxplot.fill = "white", size = 4, color = "black") +
+  coord_cartesian(xlim = c(-20000, 400000), ylim = c(-20000, 200000))
+
+print(p)
+
+p <- ggcyto(screened_data_TTcells[[2]], aes(x = `cFluor YG584-A`, y = `Spark Blue 550-A`)) +
+  geom_hex(bins = 128) +
+  scale_x_logicle() +
+  scale_y_logicle(w=1.5) +
+  geom_gate(rect_gate_1week_CD4) + 
+  geom_gate(rect_gate_1week_CD8) + 
+  theme_bw() +
+  labs(x = "CD4", y = "CD8")+
+  annotate("label", x = 5000, y = 0, label = "CD4+ T cells", boxplot.fill = "white", size = 4, color = "black") +
+  annotate("label", x = -3000, y = 12000, label = "CD8+ T cells", boxplot.fill = "white", size = 4, color = "black") +
+  coord_cartesian(xlim = c(-20000, 400000), ylim = c(-20000, 200000))
+
+print(p)
+
+p <- ggcyto(screened_data_TTcells[[3]], aes(x = `cFluor YG584-A`, y = `Spark Blue 550-A`)) +
+  geom_hex(bins = 128) +
+  scale_x_logicle() +
+  scale_y_logicle(w=1.5) +
+  geom_gate(rect_gate_3week_CD4) + 
+  geom_gate(rect_gate_3week_CD8) + 
+  theme_bw() +
+  labs(x = "CD4", y = "CD8")+
+  annotate("label", x = 5000, y = 0, label = "CD4+ T cells", boxplot.fill = "white", size = 4, color = "black") +
+  annotate("label", x = -3000, y = 20000, label = "CD8+ T cells", boxplot.fill = "white", size = 4, color = "black") +
+  coord_cartesian(xlim = c(-20000, 400000), ylim = c(-20000, 200000))
+
+print(p)
+```
+
+
+
+```{r Check the distribution of CD8 and CD4 in CD8+ and CD4+ T cells}
+for (i in 1:3){
+p=ggplot(as.data.frame(exprs(screened_data_CD8_Tcells[[i]])), aes(x=`cFluor YG584-A`)) +
+  geom_density(fill='skyblue') + 
+  labs(title="Density plot of CD4 of CD8+ T cells", x="CD4", y="Density")+
+  xlim(-10000, 250000)
+print(p)
+}
+
+
+for (i in 1:3){
+p=ggplot(as.data.frame(exprs(screened_data_CD8_Tcells[[i]])), aes(x=`Spark Blue 550-A`)) +
+  geom_density(fill='skyblue') + 
+  labs(title="Density plot of CD8 of CD8+ T cells", x="CD8", y="Density")+
+  xlim(-10000, 250000)
+print(p)
+}
+
+for (i in 1:3){
+p=ggplot(as.data.frame(exprs(screened_data_CD4_Tcells[[i]])), aes(x=`cFluor YG584-A`)) +
+  geom_density(fill='skyblue') + 
+  labs(title="Density plot of CD4 of CD4+ T cells", x="CD4", y="Density")+
+  xlim(-10000, 250000)
+print(p)
+}
+
+for (i in 1:3){
+p=ggplot(as.data.frame(exprs(screened_data_CD4_Tcells[[i]])), aes(x=`Spark Blue 550-A`)) +
+  geom_density(fill='skyblue') + 
+  labs(title="Density plot of CD8 of CD4+ T cells", x="CD8", y="Density")+
+  xlim(-10000, 250000)
+print(p)
+}
+```
+
+
+3. Save the data
+```{r Write the data in .fcs format}
+for(i in 1:length(screened_data_CD4_Tcells)){
+  write.FCS(screened_data_CD4_Tcells[[i]],file=file.path("screened_CD4+_CD8+",paste0("CD4+_",sampleNames(screened_data_CD4_Tcells)[[i]],".fcs")))
+}
+for(i in 1:length(screened_data_CD8_Tcells)){
+  write.FCS(screened_data_CD8_Tcells[[i]],file=file.path("screened_CD4+_CD8+",paste0("CD8+_",sampleNames(screened_data_CD8_Tcells)[[i]],".fcs")))
+}
+```
